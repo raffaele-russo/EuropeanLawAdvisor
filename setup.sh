@@ -65,4 +65,10 @@ docker run -p 127.0.0.1:5601:5601 -d --name kibana --network elastic-net \
   -e "xpack.license.self_generated.type=trial" \
   docker.elastic.co/kibana/kibana:8.15.2
 
-  echo "Kibana container is running."
+echo "Kibana container is running."
+
+echo "Populating data..."
+
+python3 ./fast_api_app/populate_data.py
+
+echo "All data uploaded"

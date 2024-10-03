@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 
 {% block content %}
-    <form method="POST" action="{{ url_for('handle_search') }}">
+    <form method="POST" action="/search">
       <div class="mb-3">
           <input type="text" class="form-control" name="query" id="query" placeholder="Enter your search query" value="{{ query }}" autofocus>
       </div>
@@ -41,19 +41,57 @@
                     {% endif %}
                     <div class="col"></div>
                 </div>
-                {% for result in results %}
-                    <p>
-                        {{ from_ + loop.index }}. <b><a href="{{ url_for('get_document', id=result._id) }}">{{ result._source.name }}</a></b>
-                        <br>
-                        {{ result._source.summary }}
-                        <br>
-                        <small>
-                            Category: {{ result._source.category }}.
-                            Last updated: {{ result._source.updated_at | default(result._source.created_on) }}.
-                            {% if result._score %}<i>(Score: {{ result._score }})</i>{% endif %}
-                        </small>
-                    </p>
-                {% endfor %}
+            <!-- Add Bootstrap CSS for styling -->
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-KyZXEAg3QhqLMpG8r+Knujsl5/6KpWwkA6c5HYrGtN2tlKeLtYmY3cl0p5rmIcmX6" crossorigin="anonymous">
+
+{% for result in results %}
+    <p>
+        {{ from_ + loop.index }}. {{result._source.CELEX_ID}}
+        <br>
+        <small>
+            <!-- Display truncated text (first 200 characters) -->
+            {{ result._source.Text[:200] }}... 
+            <!-- Button to trigger the modal for full text -->
+            <a href="#" data-bs-toggle="modal" data-bs-target="#modal{{ loop.index }}">Read more</a>
+            <br>
+            
+            <!-- Additional document metadata -->
+            Directory Code: {{ result._source['Directory code'] }}<br>
+            Citations: {{ result._source.Citations }}<br>
+            Publication Info: {{ result._source.PublicationInfo }}<br>
+            
+            <!-- Display either updated_at or created_on -->
+            Last updated: {{ result._source.updated_at | default(result._source.created_on) }}.
+            
+            <!-- Display search score if available -->
+            {% if result._score %}<i>(Score: {{ result._score }})</i>{% endif %}
+        </small>
+    </p>
+
+    <!-- Modal for full text -->
+    <div class="modal fade" id="modal{{ loop.index }}" tabindex="-1" aria-labelledby="modalLabel{{ loop.index }}" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalLabel{{ loop.index }}">Full Text of Document {{ result._source.CELEX_ID }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    {{ result._source.Text }}
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+{% endfor %}
+
+<!-- Add Bootstrap JS and Popper.js for modal functionality -->
+<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js" integrity="sha384-oBqDVmMz4fnFO9gybbyOBd6gH1e0K3PoYyL8a5lXGp4K/UQWdQqrggke3M/V4j1A" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.min.js" integrity="sha384-mQ93N6WVKCvvv3fWAc6RtX6IzzDwvEV0hNAmrqqtvA4l/QQ0hK9KIefAAKnWFLA/" crossorigin="anonymous"></script>
+
             </div>
         </div>
     {% elif request.method == 'POST' %}

@@ -5,11 +5,14 @@ from fastapi import FastAPI, Form, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
-from starlette.responses import JSONResponse
+from search import Search
 
 
 # Create the FastAPI app
 app = FastAPI()
+
+# Create Elastic Search client
+es = Search()
 
 # Mount the static files directory
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -24,26 +27,44 @@ async def index(request: Request):
     """
     return templates.TemplateResponse("index.html", {"request": request})
 
-@app.post("/", response_class=HTMLResponse)
-async def handle_search(request: Request, query: str = Form(...)):
+@app.post("/search", response_class=HTMLResponse)
+async def search(request: Request, query: str = Form(...)):
     """
     Handle search query from the form and return results via 'index.html' template.
     """
-    # Render the template with search results (empty for now)
+    results = es.search(
+        query={
+            'match': {
+                'Text': {
+                    'query': query
+                }
+            }
+        }
+    )
     return templates.TemplateResponse(
         "index.html", 
         {
             "request": request,
             "query": query,
-            "results": [],
+            "results": results['hits']['hits'],
             "from_": 0,
-            "total": 0
+            "total": results['hits']['total']['value']
         }
     )
 
-@app.get("/document/{id_document}", response_class=JSONResponse)
-async def get_document(id_document: int):
+@app.get("/document/{id_document}", response_class=HTMLResponse)
+async def get_document(request: Request, id_document: int):
     """
     Get document by ID.
     """
-    return {"message": f"Document with ID {id_document} not found"}
+    document = es.retrieve_document(id_document)
+    celex_id = document['_source']['CELEX_ID']
+    text = ""#document['_source']['Text']
+    return templates.TemplateResponse(
+        "document.html", 
+        {
+            "request": request,
+            "celex_id": celex_id,
+            "text": text
+        }
+    )

@@ -28,26 +28,26 @@ async def index(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
 @app.post("/search", response_class=HTMLResponse)
-async def search(request: Request, query: str = Form(...)):
+async def search(request: Request, query: str = Form(...), query_type: str = Form(...),
+                 from_ : int = Form(0)):
     """
     Handle search query from the form and return results via 'index.html' template.
     """
-    results = es.search(
-        query={
-            'match': {
-                'Text': {
-                    'query': query
-                }
-            }
-        }
-    )
+    results = []
+    if query_type == "multi_match":
+        query_fields = es.get_text_index_fields()
+        results = es.multi_match_search(query = query, query_fields = query_fields, from_=from_)
+    elif query_type == "knn":
+        results = es.knn_search(query)
+
     return templates.TemplateResponse(
         "index.html", 
         {
             "request": request,
             "query": query,
             "results": results['hits']['hits'],
-            "from_": 0,
+            "from_": from_,
+            "query_type" : query_type,
             "total": results['hits']['total']['value']
         }
     )
@@ -59,7 +59,7 @@ async def get_document(request: Request, id_document: int):
     """
     document = es.retrieve_document(id_document)
     celex_id = document['_source']['CELEX_ID']
-    text = ""#document['_source']['Text']
+    text = document['_source']['Text']
     return templates.TemplateResponse(
         "document.html", 
         {

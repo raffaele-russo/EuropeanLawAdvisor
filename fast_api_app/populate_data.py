@@ -20,6 +20,6 @@ os.remove(ZIP_FILENAME)
 # Insert data into Elastic Search
 df = pd.read_csv(FILENAME + ".csv")
 es = Search()
-es.create_index("law_docs")
+es.create_index()
 documents = df.to_dict(orient="records")
-es.insert_documents(documents = documents, index_name= "law_docs",batch_size=500)
+es.insert_documents(documents = documents, batch_size=500)

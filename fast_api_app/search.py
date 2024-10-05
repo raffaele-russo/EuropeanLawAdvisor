@@ -7,7 +7,7 @@ from sentence_transformers import SentenceTransformer
 load_dotenv()
 ELASTIC_QUERY_SIZE = int(os.environ.get("ELASTIC_QUERY_SIZE","10"))
 KNN_CANDIDATES = int(os.environ.get("KNN_CANDIDATES","50"))
-KNN_SEARCH_K = int(os.environ.get("KNN_SEARCH_K","10"))
+KNN_SEARCH_K = int(os.environ.get("KNN_SEARCH_K","20"))
 
 class Search:
     """Elastic Search Client"""
@@ -94,6 +94,32 @@ class Search:
                     size=size,
                     from_=from_
                 )
+
+    def hybrid_search(self, query, query_fields,
+    size : int = ELASTIC_QUERY_SIZE, from_ : int = 0):
+        """Perform multi match query in the specified index"""
+        return self.es.search(
+                            index = self.index,
+                            query={
+                                'multi_match': {
+                                    "query" : query,
+                                    "fields" : query_fields,   
+                                }
+                            },
+                            knn={
+                                'field': 'embedding',
+                                'query_vector': self.get_embedding(query),
+                                'num_candidates': KNN_CANDIDATES,
+                                'k': KNN_SEARCH_K,
+                            },
+                            rank={
+                                "rrf" : {
+                                    "rank_window_size" : size + from_
+                                }
+                            },
+                            size=size,
+                            from_=from_
+            )
 
     def retrieve_document(self, id_document : int):
         """Retrieve the document given the id"""

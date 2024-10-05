@@ -33,12 +33,16 @@ async def search(request: Request, query: str = Form(...), query_type: str = For
     """
     Handle search query from the form and return results via 'index.html' template.
     """
+
+    query_fields = es.get_text_index_fields()
     results = []
+
     if query_type == "multi_match":
-        query_fields = es.get_text_index_fields()
         results = es.multi_match_search(query = query, query_fields = query_fields, from_=from_)
     elif query_type == "knn":
-        results = es.knn_search(query)
+        results = es.knn_search(query, from_=from_)
+    elif query_type == "hybrid":
+        results = es.hybrid_search(query = query, query_fields = query_fields, from_=from_)
 
     return templates.TemplateResponse(
         "index.html", 

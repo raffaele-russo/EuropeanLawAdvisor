@@ -1,6 +1,7 @@
 """This script creates an index and populates with legal data"""
 import os
 import zipfile
+import joblib
 import gdown
 import pandas as pd
 from search import Search
@@ -17,9 +18,22 @@ with zipfile.ZipFile(ZIP_FILENAME,"r") as zip_ref:
 
 os.remove(ZIP_FILENAME)
 
-# Insert data into Elastic Search
-df = pd.read_csv(FILENAME + ".csv")
+# Setup Elastic Search
 es = Search()
 es.create_index()
+
+# Load data
+df = pd.read_csv(FILENAME + ".csv")
 documents = df.to_dict(orient="records")
+
+# Fit the TF-IDF vectorizer on the text data
+print("Fitting TF-IDF on the dataset...")
+documents_text = df['Text'].tolist()
+es.fit_tfidf(documents_text)
+
+# Save the fitted TF-IDF model
+joblib.dump(es.vectorizer, 'tfidf_vectorizer.pkl')
+
+print("Inserting documents...")
 es.insert_documents(documents = documents, batch_size=500)
+print("Dataset succesfully loaded.")

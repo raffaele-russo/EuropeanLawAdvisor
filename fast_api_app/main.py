@@ -1,18 +1,19 @@
 """
     European Law Advisor
 """
+import joblib
 from fastapi import FastAPI, Form, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from search import Search
 
-
 # Create the FastAPI app
 app = FastAPI()
 
-# Create Elastic Search client
+# Elastic Search Client
 es = Search()
+es.vectorizer = joblib.load('tfidf_vectorizer.pkl')
 
 # Mount the static files directory
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -34,15 +35,20 @@ async def search(request: Request, query: str = Form(...), query_type: str = For
     Handle search query from the form and return results via 'index.html' template.
     """
 
-    query_fields = es.get_text_index_fields()
     results = []
 
     if query_type == "multi_match":
-        results = es.multi_match_search(query = query, query_fields = query_fields, from_=from_)
+        results = es.multi_match_search(query = query,
+                                        query_fields = es.get_text_index_fields(),
+                                        from_=from_)
     elif query_type == "knn":
         results = es.knn_search(query, from_=from_)
     elif query_type == "hybrid":
-        results = es.hybrid_search(query = query, query_fields = query_fields, from_=from_)
+        results = es.hybrid_search(query = query,
+                                   query_fields = es.get_text_index_fields(),
+                                   from_=from_)
+    elif query_type == "tf-idf":
+        results = es.semantic_search(query, from_=from_)
 
     return templates.TemplateResponse(
         "index.html", 

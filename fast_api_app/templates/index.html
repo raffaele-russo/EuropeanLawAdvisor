@@ -3,11 +3,11 @@
 {% block content %}
 <form method="POST" action="/search">
     <div class="mb-3">
-        <input type="text" class="form-control" name="query" id="query" placeholder="Enter your search query" value="{{ query }}" autofocus>
+        <input type="text" class="form-control" name="query" id="query" placeholder="What are you looking for?" value="{{ query }}" autofocus>
     </div>
      <div class="mb-3">
         <select class="form-select" name="query_type" id="query_type" required>
-            <option value="" disabled selected>Choose your search strategy</option>
+            <option value="rag">Ask anything or choose a search strategy</option>
             <option value="multi_match">Full match</option>
             <option value="knn">KNN</option>
             <option value="hybrid">Hybrid</option>
@@ -17,8 +17,8 @@
     
     <button type="submit" class="btn btn-primary">Search</button>
 </form>
-
     {% if results %}
+        {% if not answer %}
         <div class="row mb-3">
             <div class="col-12">
                 <div class="row mb-3">
@@ -30,6 +30,7 @@
                             <a href="javascript:history.back(1)" class="btn btn-primary">← Previous page</a>
                         </div>
                     {% endif %}
+
                     {% if from_ + results|length < total %}
                         <div class="col-sm-auto my-auto">
                             <form method="POST">
@@ -43,9 +44,19 @@
                 </div>
             </div>
         </div>
+         {% endif %}
 
-        <div class="container">
+        <div class="container mt-3">
+            {% if answer %}
+            <div class="llm-output mb-4">
+                <div class="alert alert-info" role="alert">
+                    <p>{{ answer.llm_output }}</p>
+                </div>
+            </div>
+            <h2>Related laws</h2>
+            {% else %}
             <h2>Search Results</h2>
+            {% endif %}
             <div class="row">
                 {% for result in results %}
                     <div class="col-md-6 mb-4">
@@ -55,7 +66,11 @@
                             </div>
                             <div class="card-body">
                                 <p class="card-text">
+                                    {% if answer %}
+                                    {{ result.page_content[:200] }}...
+                                    {% else  %}
                                     {{ result._source.Text[:200] }}...
+                                    {% endif%}
                                 </p>
                                 <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modal{{ loop.index }}">Read more</button>
                             </div>

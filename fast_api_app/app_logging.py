@@ -1,14 +1,35 @@
-"""Logger Module"""
 import os
 import logging
-from dotenv import load_dotenv
+from config import Config
 
-# Load environment variables from .env file
-load_dotenv()
+def setup_logging(logger: logging.Logger):
+    """Configure the logging for a specific logger."""
+    
+    # Set the log level for this specific logger
+    logger.setLevel(Config.LOG_LEVEL)
 
-# Get log level from environment variable, default to INFO if not set
-log_level = os.getenv("LOG_LEVEL", "INFO").upper()
+    # Set up log format
+    log_format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    
+    # Create a console handler
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.INFO)  # Set the level for console output
 
-# Configure logging
-logging.basicConfig(level=log_level)
-logger = logging.getLogger(__name__)
+    # Create a file handler
+    file_handler = logging.FileHandler("app.log", mode='a')
+    file_handler.setLevel(logging.INFO)  # Set the level for file output
+
+    # Create a formatter and attach it to the handlers
+    formatter = logging.Formatter(log_format, datefmt='%Y-%m-%d %H:%M:%S')
+    console_handler.setFormatter(formatter)
+    file_handler.setFormatter(formatter)
+
+    # Add handlers to the logger
+    logger.addHandler(console_handler)
+    logger.addHandler(file_handler)
+
+    # Set log levels for external libraries
+    logging.getLogger('elasticsearch').setLevel(logging.CRITICAL)
+    logging.getLogger('elastic_transport.transport').setLevel(logging.CRITICAL)
+    logging.getLogger('elasticsearch.trace').setLevel(logging.CRITICAL)
+    logging.getLogger('sentence_transformers').setLevel(logging.CRITICAL)

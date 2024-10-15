@@ -34,14 +34,14 @@ docker network create elastic-net
 
 # Run the Elasticsearch container
 docker run -p 127.0.0.1:9200:9200 -d --name elasticsearch --network elastic-net \
-  -e ELASTIC_PASSWORD=$ELASTIC_PASSWORD \
+  -e ELASTIC_PASSWORD=$ELASTICSEARCH_PASSWORD \
   -e "discovery.type=single-node" \
   -e "xpack.security.http.ssl.enabled=false" \
   -e "xpack.license.self_generated.type=trial" \
   docker.elastic.co/elasticsearch/elasticsearch:8.15.2
 
 # Check if Elasticsearch is available
-until curl -u elastic:$ELASTIC_PASSWORD -s http://localhost:9200/_cluster/health | grep -q '"status":"green"'; do
+until curl -u elastic:$ELASTICSEARCH_PASSWORD -s http://localhost:9200/_cluster/health | grep -q '"status":"green"'; do
   echo "Waiting for Elasticsearch to be ready..."
   sleep 5
 done
@@ -49,7 +49,7 @@ done
 echo "Elasticsearch container is running."
 
 # Configure the Kibana password in the ES container
-curl -u elastic:$ELASTIC_PASSWORD \
+curl -u elastic:$ELASTICSEARCH_PASSWORD \
   -X POST \
   http://localhost:9200/_security/user/kibana_system/_password \
   -d '{"password":"'"$KIBANA_PASSWORD"'"}' \

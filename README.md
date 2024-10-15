@@ -16,6 +16,7 @@ EuropeanLawAdvisor allows users to retrieve information about Euopean Laws
 
 ##### You must have a working [Docker environment].
 
+
 ```
 git clone https://github.com/raffaele-russo/EuropeanLawAdvisor.git
 cd EuropeanLawAdvisor

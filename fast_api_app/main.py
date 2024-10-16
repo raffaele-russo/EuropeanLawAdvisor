@@ -1,8 +1,9 @@
 """
     European Law Advisor
 """
+import logging
 import joblib
-from fastapi import FastAPI, Form, Request
+from fastapi import FastAPI, Form, Request, HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
@@ -10,9 +11,8 @@ from search import Search
 from rag import Rag
 from config import Config
 from app_logging import setup_logging
-import logging
 
-# Setup logging 
+# Setup logging
 logger = logging.getLogger(__name__)
 setup_logging(logger)
 
@@ -26,15 +26,21 @@ try:
     es.vectorizer = joblib.load(Config.VECTORIZER_MODEL_PATH)
     logger.info("ElasticSearch client initialized successfully")
 except Exception as e:
-    logger.error(f"Error initializing ElasticSearch client: {e}")
-    raise HTTPException(status_code=500, detail="Internal server error during Elasticsearch initialization")
+    logger.error("Error initializing ElasticSearch client: %s", e)
+    raise HTTPException(
+        status_code=500,
+        detail="Internal server error during Elasticsearch init"
+        ) from e
 
 try:
     rag = Rag(es.retriever)
     logger.info("RAG initialized successfully")
 except Exception as e:
-    logger.error(f"Error initializing RAG: {e}")
-    raise HTTPException(status_code=500, detail="Internal server error during RAG initialization")
+    logger.error("Error initializing RAG: %s",e)
+    raise HTTPException(
+        status_code=500,
+        detail="Internal server error during RAG init"
+        ) from e
 
 # Mount the static files directory
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -56,17 +62,17 @@ async def search(request: Request, query: str = Form(...), query_type: str = For
     """
     Handle search query from the form and return results via 'index.html' template.
     """
-    logger.info(f"Received search request: query='{query}', type='{query_type}'")
+    logger.info("Received search request: query=%s, type=%s", query, query_type)
     results = []
-    
+
     try:
         if query_type == "rag":
             answer = rag.invoke(query)
             results = [
-                {**doc.metadata, "page_content": doc.page_content} 
+                {**doc.metadata, "page_content": doc.page_content}
                 for doc in answer["related_documents"]
             ]
-            logger.info(f"RAG search returned {len(results)} results")
+            logger.info("RAG search returned %s results", len(results))
             return templates.TemplateResponse(
                 "index.html", 
                 {
@@ -106,15 +112,18 @@ async def search(request: Request, query: str = Form(...), query_type: str = For
             }
         )
     except Exception as e:
-        logger.error(f"Error during search operation: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error during search operation")
+        logger.error("Error during search operation: %s", e)
+        raise HTTPException(
+            status_code=500,
+            detail="Internal server error during search operation"
+            ) from e
 
 @app.get("/document/{id_document}", response_class=HTMLResponse)
 async def get_document(request: Request, id_document: int):
     """
     Get document by ID.
     """
-    logger.info(f"Fetching document with ID: {id_document}")
+    logger.info("Fetching document with ID: %s", id_document)
     try:
         document = es.retrieve_document(id_document)
         celex_id = document['_source']['CELEX_ID']
@@ -128,5 +137,8 @@ async def get_document(request: Request, id_document: int):
             }
         )
     except Exception as e:
-        logger.error(f"Error retrieving document with ID {id_document}: {e}")
-        raise HTTPException(status_code=500, detail=f"Internal server error retrieving document {id_document}")
+        logger.error("Error retrieving document with ID %s: %s", id_document, e)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Internal server error retrieving document {id_document}"
+            ) from e

@@ -1,4 +1,5 @@
 """This script creates an index and populates with legal data"""
+import logging
 import os
 import zipfile
 import joblib
@@ -6,10 +7,9 @@ import gdown
 import pandas as pd
 from search import Search
 from config import Config
-import logging
 from app_logging import setup_logging
 
-# Setup logging 
+# Setup logging
 logger = logging.getLogger(__name__)
 setup_logging(logger)
 
@@ -22,8 +22,8 @@ VECTORIZER_PATH = Config.VECTORIZER_MODEL_PATH
 
 # Download and extract dataset only if the CSV file doesn't exist
 if not os.path.exists(CSV_FILENAME):
-    logger.info(f"{CSV_FILENAME} not found. Downloading and extracting dataset...")
-    
+    logger.info("%s not found. Downloading and extracting dataset...",CSV_FILENAME)
+
     # Download dataset
     gdown.download(URL_DATASET, ZIP_FILENAME, quiet=False)
 
@@ -34,14 +34,14 @@ if not os.path.exists(CSV_FILENAME):
     # Remove the zip file after extraction
     os.remove(ZIP_FILENAME)
 else:
-    logger.info(f"{CSV_FILENAME} already exists, skipping download and extraction.")
+    logger.info("%s already exists, skipping download and extraction.",CSV_FILENAME)
 
 # Setup Elasticsearch
 es = Search()
 
 # Check if the vectorizer model exists before proceeding
 if not os.path.exists(VECTORIZER_PATH):
-    logger.info(f"Fitting TF-IDF vectorizer as {VECTORIZER_PATH} does not exist...")
+    logger.info("Fitting TF-IDF vectorizer as %s does not exist...",VECTORIZER_PATH)
 
     # Load dataset for TF-IDF fitting
     df = pd.read_csv(CSV_FILENAME)
@@ -52,16 +52,16 @@ if not os.path.exists(VECTORIZER_PATH):
 
     # Save the fitted TF-IDF model
     joblib.dump(es.vectorizer, VECTORIZER_PATH)
-    logger.info(f"TF-IDF model saved to {VECTORIZER_PATH}")
+    logger.info("TF-IDF model saved to %s",VECTORIZER_PATH)
 else:
-    logger.info(f"{VECTORIZER_PATH} already exists, skipping TF-IDF fitting.")
+    logger.info("%s already exists, skipping TF-IDF fitting.",VECTORIZER_PATH)
     es.vectorizer = joblib.load(VECTORIZER_PATH)
 
-logger.info(f"Creating Elasticsearch index...")
+logger.info("Creating Elasticsearch index...")
 es.create_index()
 
 # Load dataset and insert documents
-logger.info(f"Inserting documents into Elasticsearch index...")
+logger.info("Inserting documents into Elasticsearch index...")
 df = pd.read_csv(CSV_FILENAME)
 documents = df.to_dict(orient="records")
 es.insert_documents(documents=documents)

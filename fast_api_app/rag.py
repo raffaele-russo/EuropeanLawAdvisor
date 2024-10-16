@@ -1,24 +1,12 @@
-from dotenv import load_dotenv
+"""Module for the RAG configuration"""
 from langchain_community.chat_models import ChatOllama
 from langchain import hub
 from langchain_core.runnables import RunnablePassthrough
-from langchain_core.output_parsers import StrOutputParser   
+from langchain_core.output_parsers import StrOutputParser
 from config import Config
 
-def format_docs(docs):
-    """Format document contents for input to the LLM without losing metadata, including CELEX_ID."""
-    formatted_docs = []
-    for doc in docs:
-        # Extract CELEX_ID from the document metadata
-        celex_id = doc.metadata['_source'].get('CELEX_ID')
-
-        # Prepend CELEX_ID to the document content
-        formatted_doc = f"CELEX_ID: {celex_id}\n{doc.page_content}"  
-        formatted_docs.append(formatted_doc)
-
-    return "\n\n".join(formatted_docs)  # Join documents with double newlines
-
 class Rag:
+    """Given a Retriever, the RAG provides the query related docs as context to the LLM"""
     def __init__(self, retriever=None):
         if retriever is None:
             raise ValueError("Retriever must be set.")
@@ -28,28 +16,34 @@ class Rag:
         self.retriever = retriever
 
         self.rag_chain = (
-            {"context": RunnablePassthrough(), "question": RunnablePassthrough()}  # Placeholder for dynamic context
+            {"context": RunnablePassthrough(), "question": RunnablePassthrough()}
             | self.prompt
             | self.llm
             | StrOutputParser()
         )
 
-    def invoke(self, query: str):
-        # Retrieve documents once
-        docs = self.retriever.invoke(query)
-
-        # Save metadata for each document
-        celex_metadata = []
-        documents_ids = []
-
+    def format_docs(self, docs):
+        """Format document contents for input to the LLM witt additional metadata"""
+        formatted_docs = []
         for doc in docs:
-            celex_metadata.append(doc.metadata['_source'].get('CELEX_ID', 'Unknown CELEX_ID'))
-            documents_ids.append(doc.metadata['_id'])
+            # Extract CELEX_ID from the document metadata
+            celex_id = doc.metadata['_source'].get('CELEX_ID')
 
-        # Format the documents for the LLM
-        formatted_docs = format_docs(docs)
+            # Prepend CELEX_ID to the document content
+            formatted_doc = f"CELEX_ID: {celex_id}\n{doc.page_content}"
+            formatted_docs.append(formatted_doc)
+        return "\n\n".join(formatted_docs)
 
+    def retrieve_docs_for_chain(self, query: str):
+        """Given a query, retrieves the related docs and format them"""
+        # Retrieve documents once
+        return self.retriever.invoke(query)
+
+    def invoke(self, query: str):
+        """Given a query, retrieves related docs and provides them to the chain"""
         # Prepare the context with formatted documents and the query
+        docs = self.retrieve_docs_for_chain(query)
+        formatted_docs = self.format_docs(docs)
         context = {
             "context": formatted_docs,
             "question": query,
@@ -61,8 +55,5 @@ class Rag:
         # Return the LLM output along with the CELEX_ID metadata
         return {
             "llm_output": llm_output,
-            "celex_metadata": celex_metadata,
-            "related_documents_ids": documents_ids,
             "related_documents" : docs
         }
-

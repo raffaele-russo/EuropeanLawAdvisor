@@ -1,13 +1,12 @@
 """Module responsible for the Elastic Search client that will perform the full search"""
+import logging
 from elasticsearch import Elasticsearch
-from sentence_transformers import SentenceTransformer
 from sklearn.feature_extraction.text import TfidfVectorizer
 from langchain_elasticsearch import ElasticsearchRetriever
-from models.text_embedding import TextEmbedding 
-from config import Config
-import logging
-from app_logging import setup_logging
 from tqdm import tqdm
+from models.text_embedding import TextEmbedding
+from config import Config
+from app_logging import setup_logging
 
 # Setup logger
 logger = logging.getLogger(__name__)
@@ -26,7 +25,7 @@ class Search:
                     )
             logger.info("Connected to Elasticsearch!")
         except Exception as e:
-            logger.error(f"Failed to connect to Elasticsearch: {e}")
+            logger.error("Failed to connect to Elasticsearch: %s", e)
             raise
 
         self.embedding = TextEmbedding(Config.EMBEDDING_MODEL)
@@ -55,7 +54,7 @@ class Search:
                     },
                 }
             })
-   
+
     def insert_document(self, document):
         """Insert a document in the specified index"""
         return self.es.index(index=Config.INDEX_NAME, document={
@@ -67,7 +66,8 @@ class Search:
     def insert_documents(self, documents):
         """Insert a list of documents in the specified index in batches."""
         operations = []
-        for i, document in tqdm(enumerate(documents), total=len(documents), desc="Inserting Documents"):
+        tqdm_wrapper = tqdm(enumerate(documents), total=len(documents), desc="Inserting Documents")
+        for i, document in tqdm_wrapper :
             operations.append({"index": {"_index": Config.INDEX_NAME}})
             operations.append({
                 **document,
@@ -77,12 +77,12 @@ class Search:
 
             # Once we reach the batch size, send the bulk request
             if (i + 1) % Config.BATCH_SIZE == 0:
-                response = self.es.bulk(operations=operations)
+                self.es.bulk(operations=operations)
                 operations = []
 
         # Insert any remaining documents
         if operations:
-            response = self.es.bulk(operations=operations)
+            self.es.bulk(operations=operations)
 
     def search(self, **query_args):
         """Search query in the specified index"""
@@ -203,7 +203,7 @@ class Search:
         sparse_array = zip(feature_names, tfidf_vector.toarray().flatten())
         doc_tfidf = {word: float(score) for word, score in sparse_array if score > 0.0}
         return doc_tfidf
-    
+
     def vector_query(self, search_query: str):
         """Vector query for the retriever"""
         embedding_vector = self.embedding.embed_query(search_query)

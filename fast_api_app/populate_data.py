@@ -1,39 +1,67 @@
 """This script creates an index and populates with legal data"""
+import logging
 import os
 import zipfile
 import joblib
 import gdown
 import pandas as pd
 from search import Search
+from config import Config
+from app_logging import setup_logging
 
-# Download and extract dataset
-FILE_ID = '1BZgvyxU5opZfBBzfKJfIW6eOWNZv5AES'
-URL = f'https://drive.google.com/uc?id={FILE_ID}'
-FILENAME = 'dataset'
+# Setup logging
+logger = logging.getLogger(__name__)
+setup_logging(logger)
+
+# Paths and URLs
+URL_DATASET = Config.URL_DATASET
+FILENAME = Config.DATASET_FILENAME
 ZIP_FILENAME = FILENAME + ".zip"
-gdown.download(URL, ZIP_FILENAME, quiet=False)
+CSV_FILENAME = FILENAME + ".csv"
+VECTORIZER_PATH = Config.VECTORIZER_MODEL_PATH
 
-with zipfile.ZipFile(ZIP_FILENAME,"r") as zip_ref:
-    zip_ref.extractall()
+# Download and extract dataset only if the CSV file doesn't exist
+if not os.path.exists(CSV_FILENAME):
+    logger.info("%s not found. Downloading and extracting dataset...",CSV_FILENAME)
 
-os.remove(ZIP_FILENAME)
+    # Download dataset
+    gdown.download(URL_DATASET, ZIP_FILENAME, quiet=False)
 
-# Setup Elastic Search
+    # Extract dataset
+    with zipfile.ZipFile(ZIP_FILENAME, "r") as zip_ref:
+        zip_ref.extractall()
+
+    # Remove the zip file after extraction
+    os.remove(ZIP_FILENAME)
+else:
+    logger.info("%s already exists, skipping download and extraction.",CSV_FILENAME)
+
+# Setup Elasticsearch
 es = Search()
+
+# Check if the vectorizer model exists before proceeding
+if not os.path.exists(VECTORIZER_PATH):
+    logger.info("Fitting TF-IDF vectorizer as %s does not exist...",VECTORIZER_PATH)
+
+    # Load dataset for TF-IDF fitting
+    df = pd.read_csv(CSV_FILENAME)
+    documents_text = df[Config.QUERY_TEXT_FIELD].tolist()
+
+    # Fit the TF-IDF vectorizer
+    es.fit_tfidf(documents_text)
+
+    # Save the fitted TF-IDF model
+    joblib.dump(es.vectorizer, VECTORIZER_PATH)
+    logger.info("TF-IDF model saved to %s",VECTORIZER_PATH)
+else:
+    logger.info("%s already exists, skipping TF-IDF fitting.",VECTORIZER_PATH)
+    es.vectorizer = joblib.load(VECTORIZER_PATH)
+
+logger.info("Creating Elasticsearch index...")
 es.create_index()
 
-# Load data
-df = pd.read_csv(FILENAME + ".csv")
+# Load dataset and insert documents
+logger.info("Inserting documents into Elasticsearch index...")
+df = pd.read_csv(CSV_FILENAME)
 documents = df.to_dict(orient="records")
-
-# Fit the TF-IDF vectorizer on the text data
-print("Fitting TF-IDF on the dataset...")
-documents_text = df['Text'].tolist()
-es.fit_tfidf(documents_text)
-
-# Save the fitted TF-IDF model
-joblib.dump(es.vectorizer, 'tfidf_vectorizer.pkl')
-
-print("Inserting documents...")
-es.insert_documents(documents = documents, batch_size=500)
-print("Dataset succesfully loaded.")
+es.insert_documents(documents=documents)

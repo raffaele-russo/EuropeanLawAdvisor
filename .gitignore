@@ -13,3 +13,9 @@ __pycache__/
 
 # CSV files
 *.csv
+
+# pkl files
+*.pkl
+
+# Logs
+fast_api_app/app.log

@@ -1,40 +1,49 @@
 """Module responsible for the Elastic Search client that will perform the full search"""
-import os
-from dotenv import load_dotenv
+import logging
 from elasticsearch import Elasticsearch
-from sentence_transformers import SentenceTransformer
 from sklearn.feature_extraction.text import TfidfVectorizer
-from app_logging import logger
+from langchain_elasticsearch import ElasticsearchRetriever
+from tqdm import tqdm
+from models.text_embedding import TextEmbedding
+from config import Config
+from app_logging import setup_logging
 
-load_dotenv()
-ELASTIC_QUERY_SIZE = int(os.environ.get("ELASTIC_QUERY_SIZE","10"))
-KNN_CANDIDATES = int(os.environ.get("KNN_CANDIDATES","50"))
-KNN_SEARCH_K = int(os.environ.get("KNN_SEARCH_K","20"))
+# Setup logger
+logger = logging.getLogger(__name__)
+setup_logging(logger)
 
 class Search:
     """Elastic Search Client""" 
     def __init__(self):
         """Init client connection to Elastic Search"""
-        elasticsearch_username = os.environ.get("ELASTIC_USERNAME","elastic")
-        elasticsearch_password = os.environ.get("ELASTIC_PASSWORD")
-        elasticsearch_port = int(os.environ.get("ELASTICSEARCH_PORT","9200"))
-        self.index = os.environ.get("INDEX_NAME","law_docs")
-        embedding_model = os.environ.get("EMBEDDING_MODEL","all-MiniLM-L6-v2")
-        self.es = Elasticsearch(
-                    [{"scheme": "http", "host": "localhost",
-                    "port": elasticsearch_port}],
-                    basic_auth=(elasticsearch_username, elasticsearch_password),
+        try:
+            self.es = Elasticsearch(
+                    [{"scheme": "http", "host": Config.ELASTICSEARCH_HOST,
+                    "port": Config.ELASTICSEARCH_PORT}],
+                    basic_auth=(Config.ELASTICSEARCH_USERNAME, Config.ELASTICSEARCH_PASSWORD),
                     timeout=60
                     )
-        self.model = SentenceTransformer(embedding_model)
+            logger.info("Connected to Elasticsearch!")
+        except Exception as e:
+            logger.error("Failed to connect to Elasticsearch: %s", e)
+            raise
+
+        self.embedding = TextEmbedding(Config.EMBEDDING_MODEL)
         self.vectorizer = None
-        print("Connected to Elasticsearch!")
+
+        self.retriever = ElasticsearchRetriever(
+                            es_client = self.es,
+                            index_name = Config.INDEX_NAME,
+                            body_func = self.vector_query,
+                            content_field=Config.QUERY_TEXT_FIELD,
+                        )
 
     def create_index(self):
         """Create a new index after previously deleting an index with the same name"""
-        self.es.indices.delete(index=self.index,ignore_unavailable = True)
+        logger.info("Creating index")
+        self.es.indices.delete(index=Config.INDEX_NAME,ignore_unavailable = True)
         self.es.indices.create(
-            index=self.index,
+            index=Config.INDEX_NAME,
             mappings={
                 "properties": {
                     "embedding": {
@@ -48,46 +57,42 @@ class Search:
 
     def insert_document(self, document):
         """Insert a document in the specified index"""
-        return self.es.index(index=self.index, document={
+        return self.es.index(index=Config.INDEX_NAME, document={
             **document,
-            "embedding" : self.get_embedding(document["Text"]),
-            "sparse_embedding": self.get_tfidf_scores(document["Text"])
+            "embedding" : self.get_embedding(document[Config.QUERY_TEXT_FIELD]),
+            "sparse_embedding": self.get_tfidf_scores(document[Config.QUERY_TEXT_FIELD])
         })
 
-    def insert_documents(self, documents, batch_size: int = 500):
+    def insert_documents(self, documents):
         """Insert a list of documents in the specified index in batches."""
         operations = []
-        for i, document in enumerate(documents):
-            operations.append({"index": {"_index": self.index}})
+        tqdm_wrapper = tqdm(enumerate(documents), total=len(documents), desc="Inserting Documents")
+        for i, document in tqdm_wrapper :
+            operations.append({"index": {"_index": Config.INDEX_NAME}})
             operations.append({
                 **document,
-                "embedding" : self.get_embedding(document["Text"]),
-                "sparse_embedding": self.get_tfidf_scores(document["Text"])
+                "embedding" : self.get_embedding(document[Config.QUERY_TEXT_FIELD]),
+                "sparse_embedding": self.get_tfidf_scores(document[Config.QUERY_TEXT_FIELD])
                 })
 
             # Once we reach the batch size, send the bulk request
-            if (i + 1) % batch_size == 0:
-                response = self.es.bulk(operations=operations)
+            if (i + 1) % Config.BATCH_SIZE == 0:
+                self.es.bulk(operations=operations)
                 operations = []
-
-                if response.get("errors"):
-                    logger.error("Bulk insert encountered errors %s", response)
 
         # Insert any remaining documents
         if operations:
-            response = self.es.bulk(operations=operations)
-            if response.get("errors"):
-                logger.error("Bulk insert encountered errors %s", response)
+            self.es.bulk(operations=operations)
 
     def search(self, **query_args):
         """Search query in the specified index"""
-        return self.es.search(index=self.index, **query_args)
+        return self.es.search(index=Config.INDEX_NAME, **query_args)
 
     def multi_match_search(self, query, query_fields,
-    size : int = ELASTIC_QUERY_SIZE, from_ : int = 0):
+    size : int = Config.ELASTIC_QUERY_SIZE, from_ : int = 0):
         """Perform multi match query in the specified index"""
         return self.es.search(
-                            index = self.index,
+                            index = Config.INDEX_NAME,
                             query={
                                 "multi_match": {
                                     "query" : query,
@@ -96,26 +101,26 @@ class Search:
                             }, size=size, from_= from_
             )
 
-    def knn_search(self, query, size : int = ELASTIC_QUERY_SIZE,
+    def knn_search(self, query, size : int = Config.ELASTIC_QUERY_SIZE,
                    from_ : int = 0):
         """Perform knn query in the specified index"""
         return self.es.search(
-                    index= self.index,
+                    index= Config.INDEX_NAME,
                     knn={
                         "field": "embedding",
                         "query_vector": self.get_embedding(query),
-                        "num_candidates": KNN_CANDIDATES,
-                        "k": KNN_SEARCH_K,
+                        "num_candidates": Config.KNN_CANDIDATES,
+                        "k": Config.KNN_SEARCH_K,
                     },
                     size=size,
                     from_=from_
                 )
 
     def hybrid_search(self, query, query_fields,
-    size : int = ELASTIC_QUERY_SIZE, from_ : int = 0):
+    size : int = Config.ELASTIC_QUERY_SIZE, from_ : int = 0):
         """Perform multi match query in the specified index"""
         return self.es.search(
-                            index = self.index,
+                            index = Config.INDEX_NAME,
                             query={
                                 "multi_match": {
                                     "query" : query,
@@ -125,8 +130,8 @@ class Search:
                             knn={
                                 "field": "embedding",
                                 "query_vector": self.get_embedding(query),
-                                "num_candidates": KNN_CANDIDATES,
-                                "k": KNN_SEARCH_K,
+                                "num_candidates": Config.KNN_CANDIDATES,
+                                "k": Config.KNN_SEARCH_K,
                             },
                             rank={
                                 "rrf" : {
@@ -137,13 +142,12 @@ class Search:
                             from_=from_
             )
 
-    def semantic_search(self, query, size : int = ELASTIC_QUERY_SIZE,
+    def semantic_search(self, query, size : int = Config.ELASTIC_QUERY_SIZE,
                    from_ : int = 0):
         """Perform semantic search query in the specified index"""
         tfidf_score = self.get_tfidf_scores(query)
-        print(tfidf_score)
         return self.es.search(
-                    index= self.index,
+                    index= Config.INDEX_NAME,
                     query={
                             "sparse_vector": {
                                 "field" : "sparse_embedding",
@@ -156,16 +160,16 @@ class Search:
 
     def retrieve_document(self, id_document : int):
         """Retrieve the document given the id"""
-        return self.es.get(index=self.index, id=id_document)
+        return self.es.get(index=Config.INDEX_NAME, id=id_document)
 
     def get_index_fields(self) -> list[str]:
         """Retrieve the index fields as a list"""
-        mapping = self.es.indices.get_mapping(index=self.index)
-        return list(mapping[self.index]["mappings"]["properties"])
+        mapping = self.es.indices.get_mapping(index=Config.INDEX_NAME)
+        return list(mapping[Config.INDEX_NAME]["mappings"]["properties"])
 
     def get_text_index_fields(self) -> list[str]:
         """Retrieve the text index fields as a list"""
-        index_name = self.index
+        index_name = Config.INDEX_NAME
         mapping = self.es.indices.get_mapping(index=index_name)
         properties = mapping[index_name]["mappings"]["properties"]
         searchable_fields_types = ["text"]
@@ -180,7 +184,7 @@ class Search:
 
     def get_embedding(self, text : str):
         """Get model embeddings"""
-        return self.model.encode(text)
+        return self.embedding.model.encode(text, show_progress_bar = False)
 
     def fit_tfidf(self, documents):
         """Fit the TF-IDF Vectorizer on the given documents."""
@@ -199,3 +203,15 @@ class Search:
         sparse_array = zip(feature_names, tfidf_vector.toarray().flatten())
         doc_tfidf = {word: float(score) for word, score in sparse_array if score > 0.0}
         return doc_tfidf
+
+    def vector_query(self, search_query: str):
+        """Vector query for the retriever"""
+        embedding_vector = self.embedding.embed_query(search_query)
+        return {
+            "knn": {
+                "field": "embedding",
+                "query_vector": embedding_vector,
+                "k": Config.KNN_SEARCH_K,
+                "num_candidates": Config.KNN_CANDIDATES,
+            }
+        }

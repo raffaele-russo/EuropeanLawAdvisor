@@ -55,7 +55,7 @@ curl -u elastic:$ELASTICSEARCH_PASSWORD \
   -d '{"password":"'"$KIBANA_PASSWORD"'"}' \
   -H 'Content-Type: application/json'
 
-# Run the Elasticsearch container
+# Run the Kibana container
 docker run -p 127.0.0.1:5601:5601 -d --name kibana --network elastic-net \
   -e ELASTICSEARCH_URL=http://elasticsearch:9200 \
   -e ELASTICSEARCH_HOSTS=http://elasticsearch:9200 \
@@ -66,6 +66,26 @@ docker run -p 127.0.0.1:5601:5601 -d --name kibana --network elastic-net \
   docker.elastic.co/kibana/kibana:8.15.2
 
 echo "Kibana container is running."
+
+# Check if the filebeat container exists and remove it if it does
+if [ "$(docker ps -aq -f "name=filebeat")" ]; then
+    docker rm -f $(docker ps -aq -f "name=filebeat")
+    echo "Removed filebeat container."
+else
+    echo "No filebeat container to remove."
+fi
+
+# Run the filebeat container
+docker run -d --name=filebeat --user=root  \
+  -e ELASTICSEARCH_USERNAME=$ELASTICSEARCH_USERNAME \
+  -e ELASTICSEARCH_PASSWORD=$ELASTICSEARCH_PASSWORD \
+  -e KIBANA_PASSWORD=$KIBANA_PASSWORD \
+  -v ./app.log:/usr/share/filebeat/logs/app.log \
+  -v ./filebeat.yml:/usr/share/filebeat/filebeat.yml \
+  --network elastic-net \
+  docker.elastic.co/beats/filebeat:8.15.2
+
+echo "Filebeat container is running."
 
 echo "Populating data..."
 

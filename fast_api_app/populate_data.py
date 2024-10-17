@@ -40,8 +40,9 @@ else:
 es = Search()
 
 # Check if the vectorizer model exists before proceeding
-if not os.path.exists(VECTORIZER_PATH):
-    logger.info("Fitting TF-IDF vectorizer as %s does not exist...",VECTORIZER_PATH)
+model_path = os.path.join("fast_api_app",VECTORIZER_PATH)
+if not os.path.exists(model_path):
+    logger.info("Fitting TF-IDF vectorizer as %s does not exist...",model_path)
 
     # Load dataset for TF-IDF fitting
     df = pd.read_csv(CSV_FILENAME)
@@ -51,11 +52,11 @@ if not os.path.exists(VECTORIZER_PATH):
     es.fit_tfidf(documents_text)
 
     # Save the fitted TF-IDF model
-    joblib.dump(es.vectorizer, VECTORIZER_PATH)
-    logger.info("TF-IDF model saved to %s",VECTORIZER_PATH)
+    joblib.dump(es.vectorizer, model_path)
+    logger.info("TF-IDF model saved to %s",model_path)
 else:
-    logger.info("%s already exists, skipping TF-IDF fitting.",VECTORIZER_PATH)
-    es.vectorizer = joblib.load(VECTORIZER_PATH)
+    logger.info("%s already exists, skipping TF-IDF fitting.",model_path)
+    es.vectorizer = joblib.load(model_path)
 
 logger.info("Creating Elasticsearch index...")
 es.create_index()

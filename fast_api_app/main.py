@@ -8,7 +8,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from search import Search
-from rag import Rag
+from rag import Rag, RagException
 from config import Config
 from app_logging import setup_logging
 
@@ -33,7 +33,7 @@ except Exception as e:
         ) from e
 
 try:
-    rag = Rag(es.retriever)
+    rag = Rag(es)
     logger.info("RAG initialized successfully")
 except Exception as e:
     logger.error("Error initializing RAG: %s",e)
@@ -67,12 +67,14 @@ async def search(request: Request, query: str = Form(...), query_type: str = For
 
     try:
         if query_type == "rag":
+            logger.info("Sending request to llm")
             answer = rag.invoke(query)
             results = [
                 {**doc.metadata, "page_content": doc.page_content}
                 for doc in answer["related_documents"]
             ]
             logger.info("RAG search returned %s results", len(results))
+
             return templates.TemplateResponse(
                 "index.html", 
                 {
@@ -112,11 +114,16 @@ async def search(request: Request, query: str = Form(...), query_type: str = For
             }
         )
     except Exception as e:
-        logger.error("Error during search operation: %s", e)
-        raise HTTPException(
-            status_code=500,
-            detail="Internal server error during search operation"
-            ) from e
+        logger.error("An error occured while performing the query %s", e)
+        return templates.TemplateResponse(
+            "index.html", 
+            {
+                "request": request, 
+                "results": None, 
+                "answer": None, 
+                "error_message": "An error occurred while processing your request. Please try again later."
+            })
+        
 
 @app.get("/document/{id_document}", response_class=HTMLResponse)
 async def get_document(request: Request, id_document: int):
@@ -137,8 +144,12 @@ async def get_document(request: Request, id_document: int):
             }
         )
     except Exception as e:
-        logger.error("Error retrieving document with ID %s: %s", id_document, e)
-        raise HTTPException(
-            status_code=500,
-            detail=f"Internal server error retrieving document {id_document}"
-            ) from e
+        logger.error("An error occured while retrieving a document %s", e)
+        return templates.TemplateResponse(
+            "index.html", 
+            {
+                "request": request, 
+                "results": None, 
+                "answer": None, 
+                "error_message": "An error occurred while processing your request. Please try again later."
+            })

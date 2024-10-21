@@ -72,3 +72,11 @@ fastapi dev main.py
 ```
 
 The Law Advisor is now accessible at http://localhost:8000.
+
+## References
+
+<a id="1">[1]</a> 
+Chalkidis, I., Fergadiotis, M., Malakasiotis, P., & Androutsopoulos, I. (2019). 
+Large-Scale Multi-Label Text Classification on EU Legislation. 
+In *Proceedings of the 57th Annual Meeting of the Association for Computational Linguistics*, (pp. 6314-6322), Florence, Italy. Association for Computational Linguistics. 
+[DOI: 10.18653/v1/P19-1636](https://doi.org/10.18653/v1/P19-1636) [URL](https://www.aclweb.org/anthology/P19-1636)

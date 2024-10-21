@@ -6,8 +6,8 @@ import joblib
 import gdown
 import pandas as pd
 from search import Search
-from config import Config
-from app_logging import setup_logging
+from helper.config import Config
+from helper.app_logging import setup_logging
 
 # Setup logging
 logger = logging.getLogger(__name__)

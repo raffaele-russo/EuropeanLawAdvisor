@@ -14,7 +14,7 @@ EuropeanLawAdvisor allows users to retrieve information about European Laws
 ## To set up the environment
 
 
-##### You must have a working [Docker environment].
+##### You must have a working [Docker environment] and ollama installed.
 Clone the repository:
    ```bash
    git clone https://github.com/raffaele-russo/EuropeanLawAdvisor.git
@@ -36,6 +36,24 @@ ELASTICSEARCH_USERNAME=your_elastic_username
 ELASTICSEARCH_PASSWORD=your_elastic_password
 KIBANA_PASSWORD=your_kibana_password
 ```
+EuropeanLawAdvisor can use a local LLM for the RAG.
+
+Check out ollama doc for all the models available https://ollama.com/library?sort=popular.
+
+Download the model:
+```bash
+ollama pull <LLM_MODEL>
+```
+
+and set the variable:
+```bash
+LLM_MODEL
+```
+Optionally, for better performance you can use an OpenAI model by setting:
+```bash
+OPENAI_API_KEY
+OPENAI_MODEL_NAME
+```
 ## To set up the advisor
 ```bash
 sh setup.sh
@@ -53,4 +71,4 @@ cd fast_api_app
 fastapi dev main.py
 ```
 
-The Law Advisor is now accessible at http://localhost:8000
+The Law Advisor is now accessible at http://localhost:8000.

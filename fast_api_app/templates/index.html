@@ -1,28 +1,70 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<form method="POST" action="/search">
-    <div class="mb-3">
-        <input type="text" class="form-control" name="query" id="query" placeholder="What are you looking for?" value="{{ query }}" autofocus>
-    </div>
-     <div class="mb-3">
-        <select class="form-select" name="query_type" id="query_type" required>
-            <option value="rag">Ask anything or choose a search strategy</option>
-            <option value="multi_match">Full match</option>
-            <option value="knn">KNN</option>
-            <option value="hybrid">Hybrid</option>
-            <option value="tf-idf">Semantic Search</option>
-        </select>
-    </div>
+{% if error_message %}
+<script>
+    Swal.fire({
+        title: "Error!",
+        text: "{{ error_message }}", 
+        icon: "error",
+        button: "OK",
+    });
+</script>
+{% endif %}
+
+<div class="container mb-3">
+    <!-- Navbar -->
+    <nav class="navbar bg-dark border-bottom border-body mb-3" data-bs-theme="dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">
+                <img src="/static/elastic-logo.svg" alt="Elastic" width="30" height="24" class="d-inline-block align-text-top">
+                European Law Advisor
+            </a>
+        </div>
+    </nav>
     
-    <button type="submit" class="btn btn-primary">Search</button>
-</form>
+    <!-- Search Form -->
+    <form method="POST" action="/search">
+        <div class="mb-3">
+            <input type="text" class="form-control" name="query" id="query" placeholder="What are you looking for?" value="{{ query }}" autofocus required>
+        </div>
+        <div class="mb-3">
+            <select class="form-select" name="query_type" id="query_type" required>
+                <option value="rag">Ask anything or choose a search strategy</option>
+                <option value="multi_match">Full match</option>
+                <option value="knn">KNN</option>
+                <option value="hybrid">Hybrid</option>
+                <option value="tf-idf">Semantic Search</option>
+            </select>
+        </div>
+        <div class="mb-3">
+            <button type="submit" class="btn btn-primary">Search</button>
+        </div>
+    </form>
+
+    <!-- Results Section -->
     {% if results %}
+    {% if answer %}
+        <div class="llm-output mb-4">
+            <div class="alert alert-dark rounded shadow" role="alert"> <!-- Use Bootstrap's alert class for styling -->
+                <h2 class="glow-line">Overview</h2>
+                <p class="text-light mb-0">{{ answer.llm_output }}</p> <!-- Ensure no margin on the paragraph -->
+            </div>
+        </div>
+        {% endif %}
+
+    
+        {% if answer %}
+            <h2 class="glow-line">Related Laws</h2>
+        {% else %}
+            <h2 class="glow-line">Search Results</h2>
+        {% endif %}
+        <!-- Search Pagination -->
         {% if not answer %}
         <div class="row mb-3">
             <div class="col-12">
                 <div class="row mb-3">
-                    <div class="col-sm-auto my-auto">
+                    <div class="col-sm-auto my-auto text-light">
                         Showing results {{ from_ + 1 }}-{{ from_ + results|length }} out of {{ total }}.
                     </div>
                     {% if from_ > 0 %}
@@ -30,7 +72,6 @@
                             <a href="javascript:history.back(1)" class="btn btn-primary">← Previous page</a>
                         </div>
                     {% endif %}
-
                     {% if from_ + results|length < total %}
                         <div class="col-sm-auto my-auto">
                             <form method="POST">
@@ -44,87 +85,116 @@
                 </div>
             </div>
         </div>
-         {% endif %}
+        {% endif %}
 
-        <div class="container mt-3">
-            {% if answer %}
-            <div class="llm-output mb-4">
-                <div class="alert alert-info" role="alert">
-                    <p>{{ answer.llm_output }}</p>
+        <div class="row">
+            {% for result in results %}
+            <div class="col-md-6 mb-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title">{{ from_ + loop.index }}. {{ result._source.CELEX_ID }}</h5>
+                    </div>
+                    <div class="card-body">
+                        {% if answer %}
+                            <p class="card-text">{{ result.page_content[:200] }}...</p>
+                        {% else %}
+                            <p class="card-text">{{ result._source.Text[:200] }}...</p>
+                        {% endif %}
+                        <div class="d-flex align-items-center">
+                            <button class="btn btn-primary me-2" data-bs-toggle="modal" data-bs-target="#modal{{ loop.index }}">
+                                Read more
+                            </button>
+                            <button class="btn btn-secondary me-2" type="button" data-bs-toggle="modal" data-bs-target="#citationsModal{{ loop.index }}">
+                                Citations
+                            </button>
+                            {% if answer %}
+                            <button class="btn btn-primary me-2" type="button" onclick="downloadTextFile(`{{ result._source.CELEX_ID }}`, `{{ result.page_content }}`)">
+                                <i class="fas fa-download"></i>
+                            </button>
+                            {% else %}
+                            <button class="btn btn-primary me-2" type="button" onclick="downloadTextFile(`{{ result._source.CELEX_ID }}`, `{{ result._source.Text }}`)">
+                                <i class="fas fa-download"></i>
+                            </button>
+                            {% endif %}
+                            
+                        </div>
+                    </div>
+                    <div class="card-footer">
+                        <strong>Directory Code:</strong> {{ result._source['Directory code'] }}<br>
+                        <strong>Publication Info:</strong> {{ result._source.PublicationInfo }}<br>
+                        {% if result._score %}
+                        <strong>Relevance Score:</strong> {{ '%.2f' % result._score }}<br>
+                        {% endif %}
+                    </div>
                 </div>
             </div>
-            <h2>Related laws</h2>
-            {% else %}
-            <h2>Search Results</h2>
-            {% endif %}
-            <div class="row">
-                {% for result in results %}
-                    <div class="col-md-6 mb-4">
-                        <div class="card">
-                            <div class="card-header">
-                                <h5 class="card-title">{{ from_ + loop.index }}. {{ result._source.CELEX_ID }}</h5>
-                            </div>
-                            <div class="card-body">
-                                <p class="card-text">
-                                    {% if answer %}
-                                    {{ result.page_content[:200] }}...
-                                    {% else  %}
-                                    {{ result._source.Text[:200] }}...
-                                    {% endif%}
-                                </p>
-                                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modal{{ loop.index }}">Read more</button>
-                            </div>
-                            <div class="card-footer text-muted">
-                                <div>
-                                    <strong>Directory Code:</strong> {{ result._source['Directory code'] }}<br>
-                                    <strong>Publication Info:</strong> {{ result._source.PublicationInfo }}<br>
-                                    {% if result._score %}
-                                        <i>(Score: {{ result._score }})</i>
-                                    {% endif %}
-                                </div>
-
-                                <div class="accordion mt-2" id="accordionCitations{{ loop.index }}">
-                                    <div class="accordion-item">
-                                        <h2 class="accordion-header" id="headingCitations{{ loop.index }}">
-                                            <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseCitations{{ loop.index }}" aria-expanded="true" aria-controls="collapseCitations{{ loop.index }}">
-                                                Citations ({{ result._source.Citations | length }})
-                                            </button>
-                                        </h2>
-                                        <div id="collapseCitations{{ loop.index }}" class="accordion-collapse collapse" aria-labelledby="headingCitations{{ loop.index }}" data-bs-parent="#accordionCitations{{ loop.index }}">
-                                            <div class="accordion-body">
-                                                <ul class="list-unstyled">
-                                                    <li>{{ result._source.Citations }}</li>
-                                                </ul>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+        
+            <!-- Modal for full text -->
+            <div class="modal fade" id="modal{{ loop.index }}" tabindex="-1" aria-labelledby="modalLabel{{ loop.index }}" aria-hidden="true">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="modalLabel{{ loop.index }}">Full Text of Law {{ result._source.CELEX_ID }}</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            {% if answer %}
+                            <p class="card-text">{{ result.page_content }}</p>
+                            {% else %}
+                            <p class="card-text">{{ result._source.Text }}</p>
+                            {% endif %}
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                         </div>
                     </div>
-
-                    <!-- Modal for full text -->
-                    <div class="modal fade" id="modal{{ loop.index }}" tabindex="-1" aria-labelledby="modalLabel{{ loop.index }}" aria-hidden="true">
-                        <div class="modal-dialog modal-lg">
-                            <div class="modal-content">
-                                <div class="modal-header">
-                                    <h5 class="modal-title" id="modalLabel{{ loop.index }}">Full Text of Document {{ result._source.CELEX_ID }}</h5>
-                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                </div>
-                                <div class="modal-body">
-                                    <pre>{{ result._source.Text }}</pre>  <!-- Use <pre> for preserving formatting -->
-                                </div>
-                                <div class="modal-footer">
-                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                {% endfor %}
+                </div>
             </div>
+        
+            <!-- Modal for citations -->
+            <div class="modal fade" id="citationsModal{{ loop.index }}" tabindex="-1" aria-labelledby="citationsModalLabel{{ loop.index }}" aria-hidden="true">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="citationsModalLabel{{ loop.index }}">Citations for {{ result._source.CELEX_ID }}</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body text-dark bg-light">
+                            <ul class="list-unstyled">
+                                <li>{{ result._source.Citations }}</li>
+                            </ul>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        
+            {% endfor %}
         </div>
-    
+        
+        
     {% elif request.method == 'POST' %}
-        <p>No results found.</p>
+        <p class="text-light">No results found.</p>
     {% endif %}
+
+    <script>
+        function downloadTextFile(filename, content) {
+        // Create a new Blob with the text content
+        const blob = new Blob([content], { type: 'text/plain' });
+
+        // Create a temporary link element
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = filename + '.txt'; // Set the file name with .txt extension
+
+        // Programmatically click the link to trigger the download
+        link.click();
+
+        // Clean up by revoking the object URL
+        URL.revokeObjectURL(link.href);
+    }
+        </script>
+</div>
 {% endblock %}

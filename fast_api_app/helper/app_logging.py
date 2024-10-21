@@ -1,6 +1,6 @@
 """Module responsible for the configuration of a given logger"""
 import logging
-from config import Config
+from .config import Config
 
 def setup_logging(logger: logging.Logger):
     """Configure the logging for a specific logger."""

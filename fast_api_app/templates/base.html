@@ -1,23 +1,216 @@
 <!doctype html>
 <html lang="en">
-  <head>
+<head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>European Law Advisor</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
-  </head>
-  <body>
-    <div class="container">
-      <nav class="navbar bg-dark border-bottom border-body mb-3" data-bs-theme="dark">
-        <div class="container-fluid">
-          <a class="navbar-brand" href="#">
-            <img src="/static/elastic-logo.svg" alt="Elastic" width="30" height="24" class="d-inline-block align-text-top">
-            European Law Advisor
-          </a>
-        </div>
-      </nav>
-      {% block content %}{% endblock %}
-    </div>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+    <!-- Custom Dark Theme CSS -->
+    <style>
+        /* General Styles */
+        body {
+            background-color: #1a1a1a;
+            font-family: 'Poppins', sans-serif;
+            color: #f8f9fa;
+        }
+
+        .container, .navbar, .modal-content {
+            background-color: #1a1a1a;
+            color: #f8f9fa;
+        }
+
+        .navbar {
+            font-family: 'Poppins', sans-serif;
+            background: linear-gradient(90deg, #1a1a1a, #333333);
+            border-bottom: 2px solid #555555;
+            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.8);
+            padding: 15px;
+        }
+
+        /* Gradient Title in Navbar */
+        .navbar-brand {
+            font-weight: 600;
+            font-size: 1.5rem;
+            background: linear-gradient(90deg, #8e44ad, #9b59b6); /* Gradient colors */
+            -webkit-background-clip: text; /* Clip the background to the text */
+            -webkit-text-fill-color: transparent; /* Make the text fill transparent */
+            transition: transform 0.3s ease;
+            border: none; /* Remove any border */
+        }
+
+        .navbar-brand img {
+            filter: drop-shadow(0px 0px 5px rgba(142, 68, 173, 0.7)); /* Changed to violet */
+            transition: transform 0.3s ease;
+        }
+
+        .navbar-brand img:hover {
+            transform: rotate(10deg) scale(1.1);
+        }
+
+
+        /* Optional: add a glowing effect */
+        .navbar {
+            position: relative;
+        }
+
+        .navbar::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(90deg, #8e44ad, #9b59b6, #8e44ad); /* Changed to violet */
+            animation: glow 3s infinite;
+        }
+
+        @keyframes glow {
+            0% { filter: blur(1px); }
+            50% { filter: blur(3px); }
+            100% { filter: blur(1px); }
+        }
+
+        /* SweetAlert styling for error messages */
+        .swal2-popup {
+            font-family: 'Poppins', sans-serif;
+            background-color: #333333;
+            color: #f8f9fa;
+        }
+
+        .swal2-title {
+            color: #8e44ad; /* Changed to violet */
+        }
+
+        /* Form styling (from earlier) */
+        .form-control, .form-select {
+            background-color: #333333;
+            color: #f8f9fa;
+            border: 1px solid #555555;
+            box-shadow: inset 0px 2px 5px rgba(0, 0, 0, 0.6);
+        }
+
+        .btn-primary {
+            background-color: #8e44ad; /* Changed to violet */
+            border-color: #8e44ad; /* Changed to violet */
+            color: #1a1a1a;
+            font-weight: 600;
+            transition: background-color 0.3s ease, transform 0.3s ease;
+        }
+
+        .btn-primary:hover {
+            background-color: #9b59b6; /* Changed to violet */
+            transform: scale(1.05);
+        }
+
+        /* Card styling */
+        .card {
+            background-color: #333333;
+            border: 1px solid #444444;
+            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.8);
+        }
+
+        .card-header {
+            background-color: #444444;
+            color: #f8f9fa;
+            font-weight: 600;
+        }
+
+        .card-body {
+            color: #dddddd;
+        }
+
+        .card-footer {
+            background-color: #2c2c2c;
+            color: #f8f9fa;
+        }
+
+        /* Modal Styling */
+        .modal-content {
+            background-color: #1a1a1a;
+            color: #f8f9fa;
+            border: 1px solid #555555;
+        }
+
+        .modal-header {
+            background-color: #2c2c2c;
+        }
+
+        .modal-footer .btn-secondary {
+            background-color: #555555;
+            border-color: #555555;
+        }
+
+        .modal-footer .btn-secondary:hover {
+            background-color: #444444;
+        }
+
+        /* Pagination Button Styles */
+        .btn-primary {
+            margin-right: 5px;
+            transition: all 0.3s ease;
+        }
+
+        /* Alerts for LLM Output */
+        .alert-dark {
+            background-color: #2c2c2c;
+            border-color: #555555;
+            color: #f8f9fa;
+        }
+
+        /* Special LLM Output styling with glow effect */
+        .llm-output {
+            margin-top: 20px;
+            position: relative; /* Needed for the glow effect */
+        }
+
+        /* Glow effect */
+        .llm-output::before {
+            content: '';
+            position: absolute;
+            top: -5px; /* Adjust to position glow */
+            left: -5px; /* Adjust to position glow */
+            right: -5px; /* Adjust to position glow */
+            bottom: -5px; /* Adjust to position glow */
+            background: linear-gradient(90deg, #8e44ad, #9b59b6, #8e44ad); /* Changed to violet */
+            filter: blur(5px); /* Blurred effect for glow */
+            z-index: -1; /* Position behind the alert */
+            border-radius: 0.375rem; /* Match rounded corners */
+        }
+
+        .glow-line {
+            position: relative; /* Required for positioning the pseudo-element */
+            padding: 15px; /* Match padding from .navbar */
+            font-family: 'Poppins', sans-serif; /* Consistent font */
+        }
+
+        .glow-line::after {
+            content: '';
+            position: absolute;
+            top: 100%; /* Position it below the element */
+            left: 0;
+            width: 100%;
+            height: 2px; /* Height of the glow line */
+            background: linear-gradient(90deg, #8e44ad, #9b59b6, #8e44ad); /* Changed to violet */
+            animation: glow 3s infinite; /* Apply the same animation */
+        }
+
+        /* Responsive tweaks */
+        @media (max-width: 576px) {
+            .btn-primary {
+                width: 100%;
+            }
+
+            .form-control, .form-select {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+        {% block content %}{% endblock %}    
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
-  </body>
+</body>
 </html>

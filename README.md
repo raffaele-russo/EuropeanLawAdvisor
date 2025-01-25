@@ -80,3 +80,16 @@ Chalkidis, I., Fergadiotis, M., Malakasiotis, P., & Androutsopoulos, I. (2019).
 Large-Scale Multi-Label Text Classification on EU Legislation. 
 In *Proceedings of the 57th Annual Meeting of the Association for Computational Linguistics*, (pp. 6314-6322), Florence, Italy. Association for Computational Linguistics. 
 [DOI: 10.18653/v1/P19-1636](https://doi.org/10.18653/v1/P19-1636) [URL](https://www.aclweb.org/anthology/P19-1636)
+
+## Citing this work
+
+@INPROCEEDINGS{10826025,
+  author={Russo, Raffaele and Russo, Diego and Orlando, Gian Marco and Romano, Antonio and Riccio, Giuseppe and Gatta, Valerio La and Postiglione, Marco and Moscato, Vincenzo},
+  booktitle={2024 IEEE International Conference on Big Data (BigData)}, 
+  title={EuropeanLawAdvisor: an open source search engine for European laws}, 
+  year={2024},
+  volume={},
+  number={},
+  pages={4751-4756},
+  keywords={Accuracy;Law;Large language models;Retrieval augmented generation;Europe;Legislation;Search engines;Nearest neighbor methods;Search problems;Software development management;Retrieval-Augmented Generation (RAG);NLP in Legal Industry;Generative AI;Explainable AI},
+  doi={10.1109/BigData62323.2024.10826025}}
